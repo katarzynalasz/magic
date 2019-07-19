@@ -12,10 +12,15 @@ import { Mana } from "./_models/Mana.model";
 })
 export class AppComponent implements OnInit {
   title = "app";
+
   searchValue: string;
+  userTotalMana: number;
+
   ALL_MANA = "A";
   COLORLESS_MANA = "C";
+
   CARDS: Card[];
+  userMana: Mana[];
 
   constructor(
     private cardsPipe: CardsFormatterPipe,
@@ -27,78 +32,68 @@ export class AppComponent implements OnInit {
     this.CARDS = this.manaPipe.transform(formattedCards, false);
   }
 
-  countUserMana(userMana: Mana[]): number {
+  transformUserInput(value: string): Mana[] {
+    return this.manaPipe.transform(value, true);
+  }
+
+  search() {
+    this.userMana = this.transformUserInput(this.searchValue);
+    this.userTotalMana = this.countUserTotalMana();
+    let CARDS = JSON.parse(JSON.stringify(this.CARDS));
+    for (let card of CARDS) {
+      this.checkIfCardFits(card);
+      console.log(card);
+      console.log(this.checkIfCardFits(card));
+    }
+  }
+
+  countUserTotalMana() {
     var total = 0;
-    userMana.forEach(many => {
+    this.userMana.forEach(many => {
       total = total + many.amount;
     });
     return total;
   }
 
-  transformUserInput(value: string): Mana[] {
-    return this.manaPipe.transform(value, true);
-  }
-
-  filterCardsByCost(userTotalMana: number): Card[] {
-    let filteredCards = [];
-    for (let card of this.CARDS) {
-      if (card.convertedManaCost <= userTotalMana && card.manaCost) {
-        filteredCards.push(card);
-      }
+  modifyUserandCardMana(cardMana, userMana) {
+    if (cardMana.amount < userMana.amount) {
+      userMana.amount = userMana.amount - cardMana.amount;
+      cardMana.amount = 0;
+    } else {
+      cardMana.amount = cardMana.amount - userMana.amount;
+      userMana.amount = 0;
     }
-    return filteredCards;
   }
 
-  search() {
-    let userMana = this.transformUserInput(this.searchValue);
-    let userTotalMana = this.countUserMana(userMana);
-    let filteredCards = this.filterCardsByCost(userTotalMana);
-    const copyFilteredCards = JSON.parse(JSON.stringify(filteredCards));
-    for (let card of copyFilteredCards) {
-      userMana.forEach(userMana => {
-        for (let i = 0; i < card.manaCost.length; i++) {
-          //switch
-          let mana = card.manaCost[i];
+  checkIfCardFits(card: Card): boolean {
+    let userMana = <Mana[]>JSON.parse(JSON.stringify(this.userMana));
 
-          if (
-            userMana.color === mana.color ||
-            (mana.color === this.ALL_MANA &&
-              userMana.color === this.COLORLESS_MANA)
-          ) {
-            if (mana.amount < userMana.amount) {
-              card.manaCost[i].amount = 0;
-            } else {
-              card.manaCost[i].amount = mana.amount - userMana.amount;
-            }
-          }
+    if (card.convertedManaCost === 0) {
+      return true;
+    }
+
+    if (card.convertedManaCost > this.userTotalMana || !card.manaCost) {
+      return false;
+    }
+
+    for (let i = 0; i < card.manaCost.length; i++) {
+      let cardMana = card.manaCost[i];
+
+      userMana.forEach(userMana => {
+        if (
+          userMana.color === cardMana.color ||
+          (cardMana.color === this.ALL_MANA &&
+            userMana.color === this.COLORLESS_MANA)
+        ) {
+          this.modifyUserandCardMana(cardMana, userMana);
         }
       });
     }
 
-    console.log(filteredCards);
-    console.log(copyFilteredCards);
+    if (Object.values(card.manaCost).every(x => x.amount === 0)) {
+      return true;
+    }
 
-    // const CARDS_FILTERED_ONES = JSON.parse(JSON.stringify(filteredCards));
-    // for (let card of CARDS_FILTERED_ONES) {
-    //   userMany.forEach(userMana => {
-    //     for (let i = 0; i < card.manaCost.length; i++) {
-    //       let mana = card.manaCost[i];
-    //       if (
-    //         (userMana.color === this.ALL_MANA &&
-    //           SIMPLE_MANA.includes(mana.color)) ||
-    //         (mana.color === this.ALL_MANA &&
-    //           SIMPLE_MANA.includes(userMana.color))
-    //       ) {
-    //         if (mana.amount < userMana.amount) {
-    //           card.manaCost[i].amount = -1;
-    //         } else {
-    //           card.manaCost[i].amount = mana.amount - userMana.amount;
-    //         }
-    //       }
-    //     }
-    //   });
-    // }
-    // console.log(filteredCards);
-    // console.log(CARDS_FILTERED_ONES);
+    // return "ad";
   }
 }
